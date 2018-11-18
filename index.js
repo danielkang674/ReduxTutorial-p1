@@ -1,3 +1,5 @@
+const { createStore, combineReducers } = Redux;
+
 const todo = (state, action) => {
   switch (action.type) {
     case 'ADD_TODO':
@@ -39,14 +41,11 @@ const todos = (state = [], action) => {
   }
 };
 
-const todosApp = (state = {}, action) => {
-  return {
-    todos: todos(state.todos, action),
-    visibilityFilter: visibilityFilter(state.visibilityFilter, action)
-  };
-};
+const todosApp = combineReducers({
+  todos,
+  visibilityFilter
+});
 
-const { createStore } = Redux;
 const store = createStore(todosApp);
 
 console.log(store.getState());
