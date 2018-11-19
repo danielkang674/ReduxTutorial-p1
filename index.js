@@ -1,9 +1,34 @@
 // 22
 const { createStore, combineReducers } = Redux;
 const { Component } = React;
-const ReduxStore = React.createContext();
+const { Provider, connect } = ReactRedux;
+const ReduxContext = React.createContext();
 
+// Action Creators
+let todoId = 0;
+const addTodo = (text) => {
+  return {
+    type: 'ADD_TODO',
+    id: todoId++,
+    text
+  };
+};
 
+const setVisibilityFilter = (filter) => {
+  return {
+    type: 'SET_VISIBILITY_FILTER',
+    filter
+  };
+};
+
+const toggleTodo = (id) => {
+  return {
+    type: 'TOGGLE_TODO',
+    id
+  };
+};
+
+// Reducers
 const todo = (state, action) => {
   switch (action.type) {
     case 'ADD_TODO':
@@ -45,6 +70,7 @@ const todos = (state = [], action) => {
   }
 };
 
+// All reducers combined
 const todosApp = combineReducers({
   todos,
   visibilityFilter
@@ -77,21 +103,19 @@ const Todo = ({ completed, text, onClick }) => (
   </li>
 );
 
-const AddTodo = () => {
+let AddTodo = ({ dispatch }) => {
   let input = '';
   return (
-    <ReduxStore.Consumer>
-      {({ store }) => (
-        <form onSubmit={e => e.preventDefault()}>
-          <input type="text" ref={node => input = node}></input>
-          <button type="submit" onClick={() => { store.dispatch({ type: 'ADD_TODO', id: todoId++, text: input.value }); input.value = ''; }}>
-            Add Todo
-          </button>
-        </form>
-      )}
-    </ReduxStore.Consumer>
+    <form onSubmit={e => e.preventDefault()}>
+      <input type="text" ref={node => input = node}></input>
+      <button type="submit" onClick={() => { dispatch(addTodo(input.value)); input.value = ''; }}>
+        Add Todo
+      </button>
+    </form>
   );
-}
+};
+AddTodo = connect()(AddTodo)
+
 
 const Link = ({ active, children, onClick }) => {
   if (active) {
@@ -107,29 +131,19 @@ const Link = ({ active, children, onClick }) => {
   );
 };
 
-class FilterLink extends Component {
-  componentDidMount() {
-    const { store } = this.context;
-    this.unsubscribe = store.subscribe(() => {
-      this.forceUpdate();
-    });
-  }
+const mapStateToFilterProps = (state, ownProps) => {
+  return {
+    active: state.visibilityFilter === ownProps.filter
+  };
+};
 
-  componentWillUnmount() {
-    this.unsubscribe();
-  }
-  render() {
-    const props = this.props;
-    const { store } = this.context;
-    const state = store.getState();
-
-    return (
-      <Link active={state.visibilityFilter === props.filter} onClick={() => store.dispatch({ type: 'SET_VISIBILITY_FILTER', filter: props.filter })}>{props.children}</Link>
-    );
+const mapStateToFilterDispatch = (dispatch, ownProps) => {
+  return {
+    onClick: () => dispatch(setVisibilityFilter(ownProps.filter))
   }
 };
-FilterLink.contextType = ReduxStore;
 
+const FilterLink = connect(mapStateToFilterProps, mapStateToFilterDispatch)(Link);
 
 const Footer = () => (
   <p>
@@ -139,29 +153,20 @@ const Footer = () => (
   </p>
 );
 
-class VisibileTodoList extends Component {
-  componentDidMount() {
-    const { store } = this.context;
-    this.unsubscribe = store.subscribe(() => {
-      this.forceUpdate();
-    });
-  }
-
-  componentWillUnmount() {
-    this.unsubscribe();
-  }
-  static contextType = ReduxStore;
-  render() {
-    const { store } = this.context;
-    const state = store.getState();
-    return (
-      <TodoList todos={getVisibleTodos(state.todos, state.visibilityFilter)} onTodoClick={id => store.dispatch({ type: 'TOGGLE_TODO', id })} />
-    );
+const mapStateToTodoListProps = (state) => {
+  return {
+    todos: getVisibleTodos(state.todos, state.visibilityFilter)
   }
 };
 
+const mapDispatchToTodoListProps = (dispatch) => {
+  return {
+    onTodoClick: id => dispatch(toggleTodo(id))
+  }
+};
 
-let todoId = 0;
+const VisibileTodoList = connect(mapStateToTodoListProps, mapDispatchToTodoListProps)(TodoList);
+
 const TodoApp = () => {
   return (
     <div>
@@ -172,18 +177,8 @@ const TodoApp = () => {
   );
 };
 
-class Provider extends Component {
-  render() {
-    return (
-      <ReduxStore.Provider value={{ store: createStore(todosApp) }} >
-        {this.props.children}
-      </ReduxStore.Provider>
-    );
-  }
-};
-
 ReactDOM.render(
-  <Provider>
+  <Provider store={createStore(todosApp)}>
     <TodoApp />
   </Provider>,
   document.getElementById('root')
